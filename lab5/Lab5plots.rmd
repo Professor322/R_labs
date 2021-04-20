@@ -1,0 +1,55 @@
+---
+title: "Plot"
+author: "Kochetkov Nikolai"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document: 
+    self_contained: yes
+    #css: style.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library('WDI')
+library('data.table')
+library('leaflet')
+library('googleVis')
+suppressPackageStartupMessages(library('googleVis'))
+
+
+```
+
+## Life expectancy at birth, total (years)
+
+```{r, results='asis', cache=TRUE, warning=T, message=T}
+# Индикатор показателя
+indicator.code <- 'SP.DYN.LE00.IN'
+
+data <- read.csv('./data/Health_WDI.csv', header = T, sep = ',')
+data <- data.table(data)
+
+# Коды стран iso2
+fileURL <- 'https://pkgstore.datahub.io/core/country-list/data_csv/data/d7c9d7cfb42cb69f4422dec222dbbaa8/data_csv.csv'
+all.iso2.country.codes <- read.csv(fileURL, 
+                                   stringsAsFactors = FALSE, na.strings = '.')
+
+# Убираем макрорегионы
+data <- na.omit(data[iso2c %in% all.iso2.country.codes$Code, ])
+
+# Объект таблица исходных данных
+g.tbl <- gvisTable(data = data[, -'year'], 
+                   options = list(width = 300, height = 400))
+
+# Объект интерактивная карта
+g.chart <- gvisGeoChart(data = data, locationvar = 'iso2c',
+                        hovervar = 'country', colorvar = indicator.code,
+                        options = list(width = 500, 
+                                       height = 400, dataMode = 'regions'))
+
+# Разместить таблицу и карту на одной панели
+TG <- gvisMerge(g.tbl, g.chart, 
+                horizontal = TRUE, 
+                tableOptions = 'bgcolor=\"#CCCCCC\" cellspacing=10')
+TG
+```
+

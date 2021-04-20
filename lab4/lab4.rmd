@@ -1,0 +1,139 @@
+---
+title: "Лабораторная работа №4. Статические карты"
+author: "Кочетков Николай"
+date: "4/6/2021"
+output: html_document
+---
+### Вариант 11. Центральный федеральный округ, любой показатель из раздела «Промышленное производство»
+
+
+Инициализируем карту - хороплет
+
+```{r, echo=FALSE, message=FALSE}
+#подключим необходимые библиотеки
+library('R.utils')               # gunzip() для распаковки архивов 
+library('sp')                    # функция spplot()
+library('ggplot2')               # функция ggplot()
+library('RColorBrewer')          # цветовые палитры
+require('rgdal')                 # функция readOGR()
+library('broom')                 # функция tidy()
+require('dplyr')                 # функция join()
+library('scales')                # функция pretty_breaks()
+library('mapproj')               # проекции для карт
+library('gpclib')
+library('maptools')
+library('gpclib')
+# включаем остальные пакеты
+require('plyr')                  # функция join()
+library('mapproj')               # работа с проекциями карт
+library('scales')                # функция pretty_breaks()
+```
+
+Загрузим с https://gadm.org/download_country_v3.html
+```{r}
+# разархивируем их
+unzip("data/gadm36_RUS_shp.zip", exdir = "data/Адм-территориальные границы РФ")
+dir("./data/Адм-территориальные границы РФ/")
+
+```
+
+
+
+
+```{r}
+
+
+Regions1 <- readOGR("./data/Адм-территориальные границы РФ/gadm36_RUS_1.shp", encoding = "UTF-8", stringsAsFactors = F)
+#Загрузив данные стало понятно, что нужная нам с административныни территориальными границами находится в файле gadm36_RUS_1.shp,
+#так как карта загрузилась с "with 83 features". Ровно столько, сколько у нас регионов
+#Проверим то, как выглядит эта карта
+
+
+plot(Regions1, main ='Границы областей', asp =1.8) 
+slotNames(Regions1)
+#Извлечем из всех областей центральный федеральный округ
+
+df.central.reg_idx <- c(43, 44, 7, 8, 79, 19, 67, 72, 76, 52, 23, 33, 37, 39, 59, 64, 81, 70)
+length(df.central.reg_idx)
+df.central.region.map <- Regions1[df.central.reg_idx,  ]
+plot(df.central.region.map, main ='Центральный округ', asp =1.8) 
+
+
+
+```
+
+
+## Подготовка данных для построенния карты 
+Добавим на карту центрального федерального округа данные о месте занимаемом областью по производству пива за 2011 год.
+```{r}
+df.central.2010 <- read.csv2("./data/df.central.beer.2010.csv", stringsAsFactors = F) %>%     
+                                                          select(RegName, BeerPlace)
+
+
+#подправим данные связанные с г. Москва, так как в поле NL_NAME_1 стоит NA
+df.central.region.map@data[1, "NL_NAME_1"] <- "г. Москва"
+df.central.region.map@data <- merge(df.central.region.map@data, df.central.2010, by.x = "NL_NAME_1", by.y = "RegName")
+
+
+
+```
+
+## Карта хороплет построенная функцией spplot()
+```{r}
+library(RColorBrewer)
+mypalette <- colorRampPalette(c('whitesmoke', 'coral3'))
+
+
+spplot(df.central.region.map, "BeerPlace", 
+       col.regions = mypalette(16), 
+       col  = "coral4", 
+       main ="Место занимаемое регионом по производству пива. 2010 год",
+       panel = function(x, y, z, subscripts, ...) {
+         panel.polygonsplot(x, y, z, subscripts, ...)
+         sp.text(coordinates(df.central.region.map),
+                 df.central.region.map$NAME_1[subscripts])
+       }
+)
+```
+
+
+
+
+
+
+## Карта хороплет построенная функцией ggplot()
+
+```{r}
+df.central.2011 <- read.csv2("./data/df.central.beer.2011.csv", stringsAsFactors = F) %>%     
+                                                          select(RegName, BeerPlace)
+colnames(df.central.2011) <- c("id", "BeerPlace")
+gpclibPermit()
+central.region.map <- Regions1[df.central.reg_idx,  ]
+central.region.map@data[1, "NL_NAME_1"] <- "г. Москва"
+central.region.map@data$id <- central.region.map@data$NL_NAME_1
+central.region.map.points <- fortify(central.region.map , region = "id")
+central.region.map.points.df <- join(central.region.map.points, central.region.map@data, by = "id")
+
+central.region.df <- join(central.region.map.points.df, df.central.2011, by = "id")
+names(central.region.df)
+centroids.df <- as.data.frame(coordinates(central.region.map))
+centroids.df$id <- central.region.map$id
+colnames(centroids.df) <-c('long', 'lat', 'id')
+
+gp <- ggplot() + 
+  geom_polygon(data = central.region.df, 
+               aes(long, lat, group = group,
+                   fill = BeerPlace)) + 
+  geom_path(data = central.region.df, aes(long, lat, group = group),
+            color = 'coral4') + 
+  coord_map(projection = 'gilbert') + 
+  scale_fill_distiller(palette = 'OrRd',
+                       direction = 1,
+                       breaks = pretty_breaks(n = 5)) + 
+  labs(x = "Долгота", y = "Широта",
+       title = "Место занимаемое регионом по производству пива. 2011 год") + 
+  geom_text(data = centroids.df, aes(long, lat, label = id))
+
+gp
+```
+

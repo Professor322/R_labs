@@ -1,0 +1,44 @@
+---
+title: "Untitled"
+author: "Kochetkov Nikolai"
+date: "19/04/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Задание
+
+# 1. Картограмма с таблицей стран мира по показателю из базы Всемирного банка
+#   (интерактивная картограмма из примера).
+# 2. Карта с маркерами или с радиусами, построенная по набору данных с Портала
+#    открытых данных РФ.
+# WDI: любой показатель из раздела "Health" (Гендерное неравенство). Портал
+#открытых данных: Сведения о местах нахождения многоквартирных жилых домов, в
+#которых осуществлен капитальный ремонт, по Краснодарскому краю (id: 2308078236-18dom), взять только расположенные в городе Краснодар
+
+```{r}
+library('httr')
+library('jsonlite')
+library('XML')
+library('RCurl')
+library('WDI')
+library('data.table')
+
+```
+
+# Life expectancy at birth, total (years)
+
+```{r}
+# Индикатор показателя
+indicator.code <- 'SP.DYN.LE00.IN'
+
+# Парсим данные с WDI
+data <- data.table(WDI(indicator = indicator.code, start = 2019, end = 2019))
+
+# Загружаем данные в csv файл
+write.csv(data, file = './data/Health_WDI.csv', row.names = F)
+```
+
